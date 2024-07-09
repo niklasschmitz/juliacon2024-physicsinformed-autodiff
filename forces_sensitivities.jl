@@ -13,11 +13,9 @@ cell = (; parsed.lattice, parsed.atoms, parsed.positions)
 
 # Numerical parameters
 temperature = 0.00225  # Temperature for Fermi-Dirac Smearing.
-kgrid = [2, 2, 2]      # Brillouin-zone discretization
-
-# TODO increase to 150
-Ecut = 5       # Plane-wave discretization (energy cutoff)
-tol = 1e-11    # SCF tolerance for density convergence
+kgrid = [2, 4, 4]      # Brillouin-zone discretization
+Ecut = 150       # Plane-wave discretization (energy cutoff)
+tol = 1e-8    # SCF tolerance for density convergence
 
 # Create supercell
 supercell_size = (2, 1, 1)
@@ -35,8 +33,18 @@ supercell = DFTK.create_supercell(
 #     positions = supercell.positions #+ [[0.01, 0, 0], [0., 0, 0]]
 # )
 
+function run_scf(ε::T; Ecut=5, tol=1e-8, symmetries=false) where {T}
+    (; lattice, atoms, positions) = supercell
+    pos = positions + ε * [[1., 0, 0], [0., 0, 0]]
+    model = model_LDA(Matrix{T}(lattice), atoms, pos; temperature, symmetries)
+    basis = PlaneWaveBasis(model; Ecut, kgrid)
+    response = ResponseOptions(; verbose=true)
+    is_converged = DFTK.ScfConvergenceDensity(tol)
+    self_consistent_field(basis; is_converged, response)
+end
 
-function compute_force(ε::T; Ecut=5, tol=1e-11, symmetries=false) where {T}
+
+function compute_force(ε::T; Ecut=5, tol=1e-8, symmetries=false) where {T}
     (; lattice, atoms, positions) = supercell
     pos = positions + ε * [[1., 0, 0], [0., 0, 0]]
     model = model_LDA(Matrix{T}(lattice), atoms, pos; temperature, symmetries)
