@@ -1,6 +1,7 @@
 using DFTK
 using AtomsIO
 using LinearAlgebra
+using JLD2
 using ForwardDiff
 using ComponentArrays
 
@@ -68,7 +69,6 @@ end
 
 # TODO can compare with FiniteDifferences.jl and "factor"
 
-
 derivative_ε = ForwardDiff.derivative(compute_force, 0.0)
 
 derivative_ε_sym = let ε = 1e-5
@@ -78,4 +78,32 @@ derivative_ε_sym = ForwardDiff.derivative(
     ε -> compute_force(ε; symmetries=true), 
     0.0
 )
+
+function compute_force_ca(ε::T; Ecut=5, tol=1e-8, symmetries=false) where {T}
+    (; lattice, atoms, positions) = supercell
+    pos = positions + ε * [[1., 0, 0], [0., 0, 0]]
+    model = model_LDA(Matrix{T}(lattice), atoms, pos; temperature, symmetries)
+    basis = PlaneWaveBasis(model; Ecut, kgrid)
+    response = ResponseOptions(; verbose=true)
+    is_converged = DFTK.ScfConvergenceDensity(tol)
+    scfres = self_consistent_field(basis; is_converged, response)
+    forces = compute_forces_cart(scfres)
+    ComponentArray(
+        forces=forces,
+        ρ=scfres.ρ,
+        energies=collect(values(scfres.energies)),
+        εF=scfres.εF,
+        occupation=reduce(vcat, scfres.occupation),
+    )
+end
+
+using DifferentiationInterface
+
+
+for Ecut in 5:5:20
+    scfres = run_scf(0.0; Ecut)  # TODO duplication is not necessary here.
+    F, dF = value_and_derivative(ε -> compute_force_ca(ε; Ecut), AutoForwardDiff(), 0.0)
+    save_scfres("scf/Li-BCC-Ecut$Ecut-scfres.jld2", scfres;
+                save_ψ=false, extra_data=Dict("F"=>F, "dF"=>dF))
+end
 
