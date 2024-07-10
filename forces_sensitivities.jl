@@ -27,13 +27,6 @@ supercell = DFTK.create_supercell(
     supercell_size
 )
 
-# # Displace second atom to get nonzero forces
-# supercell = (;
-#     supercell.lattice,
-#     supercell.atoms,
-#     positions = supercell.positions #+ [[0.01, 0, 0], [0., 0, 0]]
-# )
-
 function run_scf(ε::T; Ecut=5, tol=1e-8, symmetries=false) where {T}
     (; lattice, atoms, positions) = supercell
     pos = positions + ε * [[1., 0, 0], [0., 0, 0]]
@@ -44,17 +37,7 @@ function run_scf(ε::T; Ecut=5, tol=1e-8, symmetries=false) where {T}
     self_consistent_field(basis; is_converged, response)
 end
 
-
-function compute_force(ε::T; Ecut=5, tol=1e-8, symmetries=false) where {T}
-    (; lattice, atoms, positions) = supercell
-    pos = positions + ε * [[1., 0, 0], [0., 0, 0]]
-    model = model_LDA(Matrix{T}(lattice), atoms, pos; temperature, symmetries)
-    basis = PlaneWaveBasis(model; Ecut, kgrid)
-    response = ResponseOptions(; verbose=true)
-    is_converged = DFTK.ScfConvergenceDensity(tol)
-    scfres = self_consistent_field(basis; is_converged, response)
-    compute_forces_cart(scfres)
-end
+compute_force(ε; kwargs...) = compute_forces_cart(run_scf(ε; kwargs...))
 
 F = compute_force(0.0)
 
@@ -65,6 +48,9 @@ end
 derivative_ε_fd_central = let ε = 1e-5
     (compute_force(ε) - compute_force(-ε)) / 2ε
 end
+
+scfres = run_scf(0.1)
+save_scfres("scfres_dummy.jld2", scfres; save_ψ=true)
 
 
 # TODO can compare with FiniteDifferences.jl and "factor"
