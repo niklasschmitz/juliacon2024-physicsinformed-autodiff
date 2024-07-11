@@ -25,6 +25,7 @@ begin
 	using ComponentArrays
 	using ForwardDiff
 	using CairoMakie
+	using ColorSchemes
 	using PlutoUI
 	DFTK.setup_threading()
 	CairoMakie.set_theme!(theme_latexfonts())
@@ -100,99 +101,119 @@ md"""
 
 # ╔═╡ c47feb25-4f65-4d9c-ab77-ef10bab65144
 begin
-	# The physical system of atoms.
+	# The physical system of atoms
 	system = load_system("./Li-BCC.xsf")
+	system = attach_psp(system, Dict(:Li => "hgh/lda/Li-q3"))
 	parsed = DFTK.parse_system(system)
-	lattice = parsed.lattice
-	positions = parsed.positions
-
-	# Exchange-correlation
-	xc = "pbe"
-
-	# Pseudopotential
-	Li = ElementPsp(:Li, psp=load_psp("hgh/$(xc)/li-q3"))
-	atoms = [Li]
-
+	cell = (; parsed.lattice, parsed.atoms, parsed.positions)
+	
+	# Create supercell
+	supercell_size = (2, 1, 1)
+	supercell = DFTK.create_supercell(
+	    cell.lattice,
+	    cell.atoms,
+	    cell.positions,
+	    supercell_size
+	)
+	
 	# Numerical parameters
 	temperature = 0.00225  # Temperature for Fermi-Dirac Smearing.
-	nkpt = 1    		   # Brillouin-zone discretization
-	Ecut = 150   		   # Plane-wave discretization (energy cutoff)
-	tol = 1e-7             # SCF tolerance for density convergence
+	kgrid = [2, 4, 4]      # Brillouin-zone discretization
+	Ecut = 30   		   # Plane-wave discretization (energy cutoff)
+	tol = 1e-8             # SCF tolerance for density convergence
 end;
 
-# ╔═╡ fc77a0cb-0e30-43db-89ea-e64bada99104
-Li.psp
-
-# ╔═╡ f843a1cb-4183-407e-b5b6-2a752e7bbe0d
-begin
-	flatten(Li) = ComponentArray(; rloc=Li.psp.rloc, cloc=Li.psp.cloc)
-
-	function unflatten(params)
-		(; rloc, cloc) = params
-		T = eltype(params)
-		psp = PspHgh{T}(3, rloc, cloc, -1, T[], Matrix{T}[],
-						"hgh/pbe/li-q3", "Li GTH-PBE-q3")
-		ElementPsp(:Li; psp)
-	end
+# ╔═╡ e5aedd90-2e91-49ee-b1b3-dc555330754d
+function run_scf(ε::T; Ecut, tol=1e-8, symmetries=false) where {T}
+    (; lattice, atoms, positions) = supercell
+    pos = positions + ε * [[1., 0, 0], [0., 0, 0]]
+    model = model_LDA(Matrix{T}(lattice), atoms, pos; temperature, symmetries)
+    basis = PlaneWaveBasis(model; Ecut, kgrid)
+    response = ResponseOptions(; verbose=true)
+    is_converged = DFTK.ScfConvergenceDensity(tol)
+    self_consistent_field(basis; is_converged, response)
 end
 
-# ╔═╡ 4f9a4fc2-eba0-4991-b0e8-2a5ee3d9219a
-params_q3 = flatten(Li)
+# ╔═╡ 1cc2a095-567f-4426-b81f-b52977ace8ce
+scfres = run_scf(0.0; Ecut)
 
-# ╔═╡ eba2e87d-fe0a-43ea-a6dc-2c20d4553d27
-flatten(unflatten(params_q3)) == params_q3
+# ╔═╡ e0788ac8-bf2d-4743-809f-31a5b0e8c0cd
+scfres.energies
 
-# ╔═╡ ad7dd3d2-0a19-4244-95eb-26abb034d3d6
-function run_psp(params; lattice, positions, temperature, xc, nkpt, Ecut, tol)
-	T = eltype(params)
-	Li = unflatten(params)
-	atoms = [Li]
-	supported_models = Dict(
-		"lda"=>model_LDA,
-		"pbe"=>model_PBE,
-	)
-	model_constructor = supported_models[xc]
-	model = model_constructor(lattice, atoms, positions; temperature)
-	basis = PlaneWaveBasis(model; Ecut, kgrid=(nkpt, nkpt, nkpt))
-	is_converged = ScfConvergenceDensity(tol)
-	scfres = self_consistent_field(basis; is_converged)
-end
+# ╔═╡ 1851fb6b-8388-428f-b02e-b2bd16a4cf2d
+compute_forces_cart(scfres)
 
-# ╔═╡ 435ff8f4-f10a-4b3f-9fc4-fcd36a25628d
-# scfres = run_psp(params_q3; lattice, positions, temperature, xc, nkpt, Ecut, tol)
+# ╔═╡ 41fc1adc-255d-4611-ac05-a0461d524dbc
+md"""### Aside: Precomputed results
+"""
 
-# ╔═╡ 46a96e8b-3e4b-4577-a83a-91c0e717fb19
-
-
-# ╔═╡ ff992b5d-c291-4054-8368-49440d9e6335
-
-
-# ╔═╡ 12742ad9-8a50-4637-b1af-f4c1732b74b2
-precomputed = [load_scfres(f) for f in readdir("scf"; join=true)]
+# ╔═╡ 74e1c56d-b553-406a-b60c-6b1f002e0b6f
+precomputed = sort(
+	map(readdir("scf"; join=true)) do f
+		scfres = load_scfres(f)
+		F  = jldopen(f)["F"]
+		dF = jldopen(f)["dF"]
+		(; scfres, F, dF)
+	end,
+	by=row -> row.scfres.basis.Ecut,
+)
 
 # ╔═╡ 450b3f4a-9bc2-49fa-83f5-419d9510bc34
-Ecuts = sort(map(scfres -> scfres.basis.Ecut, precomputed))
+Ecuts = map(row -> row.scfres.basis.Ecut, precomputed)
 
-# ╔═╡ d4756e82-3adc-4cd1-a531-d39d042fb995
+# ╔═╡ 8dd8c375-3cb3-4e5a-9c11-b7cc31f7fe58
+let fig = Figure(size=(600,300))
+	cmap = cgrad(colorschemes[:thermal], length(Ecuts), categorical=true, rev=true)
 
+	ax1 = Makie.Axis(fig[1,1][1,1], yscale=log10, xlabel="iteration", ylabel="ρ error")
+	for (i, row) in enumerate(precomputed)
+		scatterlines!(ax1, row.scfres.history_Δρ, color=cmap[i])
+	end
+
+	ax2 = Makie.Axis(fig[1,2][1,1], yscale=log10, xlabel="iteration", ylabel="ρ error")
+	for (i, row) in enumerate(precomputed)
+		scatterlines!(ax2, row.scfres.history_Δρ, color=cmap[i])
+	end
+	
+	Colorbar(fig[1,2][1,2], label="Ecut (Ha)", colormap=cmap,
+			 ticks=Ecuts, limits=extrema(Ecuts))
+	fig
+end
+
+# ╔═╡ 3c72f185-dcb7-4d34-a9d8-12e277113fad
+md"""
+### Increasing discretization
+"""
+
+# ╔═╡ 0d134e59-f41c-4f7b-a256-939a987fbacc
+let fig = Figure()
+	ax = Makie.Axis(fig[1,1], xlabel="Ecut (Ha)", ylabel="Total energy error (Ha)", yscale=log10, xticks=Ecuts)
+	e = [row.scfres.energies.total for row in precomputed]
+	scatterlines!(ax, Ecuts[1:end-1], abs.(e[1:end-1] .- e[end]), linestyle=:dash)
+	
+	fig
+end
 
 # ╔═╡ 19d5f7b2-a647-46c5-ac90-a65f3702067b
 @bind Ecut_plot PlutoUI.Slider(Ecuts; show_value=true)
 
-# ╔═╡ df9081fb-fa99-4868-bdbc-e30b4634504c
-scfres = precomputed[findfirst(x -> x.basis.Ecut==Ecut_plot, precomputed)]
-
-# ╔═╡ 0d083477-c2f2-4952-9aff-61038ffcc88a
-keys(scfres)
-
 # ╔═╡ 44f0c327-dfff-44c7-b644-4fec4c779a60
 let fig = Figure()
-	ax = Makie.Axis(fig[1,1])
-	heatmap!(ax, scfres.ρ[:,:,1])
-
-	ax2 = Makie.Axis(fig[2,1])
+	row = precomputed[findfirst(row -> row.scfres.basis.Ecut==Ecut_plot, precomputed)]
+	
+	ax = Makie.Axis(fig[1,1][1,1], title=L"\rho")
+	hmap = heatmap!(ax, row.scfres.ρ[:,:,1], colorscale=log10)
+	Colorbar(fig[1,1][1,2], hmap)
+	
+	ax2 = Makie.Axis(fig[2,1][1,1], title=L"\delta\rho")
+	hmap2 = heatmap!(ax2, row.dF.ρ[:,:,1])
+	Colorbar(fig[2,1][1,2], hmap2)
+	
 	fig
 end
+
+# ╔═╡ 56971cac-4eb4-4ef5-aef1-e3d87e914431
+row.dF.ρ
 
 # ╔═╡ 6afaf07d-1d74-42b8-8e2e-6dcdb3c70c6c
 md"""
@@ -233,6 +254,7 @@ md"""
 
 - DFTK docs
 - Elements of Differentiable Programming
+- Numerical stability and efficiency of response property calculations in density functional theory
 - Differentiable Programming for Differential Equations: A Review
 
 """
@@ -247,11 +269,15 @@ md"""
 **TODO insert logos, MatMat, EPFL, MARVEL, GSOC**
 """
 
+# ╔═╡ b33e9ad1-008a-4b2e-885d-b9bbb27191d4
+
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 AtomsIO = "1692102d-eeb4-4df9-807b-c9517f998d44"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 DFTK = "acf6eb54-70d9-11e9-0013-234b7a5f5337"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
@@ -264,6 +290,7 @@ UnitfulAtomic = "a7773ee8-282e-5fa2-be4e-bd808c38a91a"
 [compat]
 AtomsIO = "~0.2.3"
 CairoMakie = "~0.12.5"
+ColorSchemes = "~3.25.0"
 ComponentArrays = "~0.15.13"
 DFTK = "~0.6.19"
 ForwardDiff = "~0.10.36"
@@ -279,7 +306,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "7c94634a160d6ce747c234c64b5b150b10f7c184"
+project_hash = "3d8c78d5ef2a9bd14719d128766d77854c7bca9a"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -2383,21 +2410,19 @@ version = "3.5.0+0"
 # ╟─c10a0acf-058d-43a7-b888-1f24e5daf3c2
 # ╟─edfbc430-64e1-4faa-b0f1-a63c50bf0744
 # ╠═c47feb25-4f65-4d9c-ab77-ef10bab65144
-# ╠═fc77a0cb-0e30-43db-89ea-e64bada99104
-# ╠═f843a1cb-4183-407e-b5b6-2a752e7bbe0d
-# ╠═4f9a4fc2-eba0-4991-b0e8-2a5ee3d9219a
-# ╠═eba2e87d-fe0a-43ea-a6dc-2c20d4553d27
-# ╠═ad7dd3d2-0a19-4244-95eb-26abb034d3d6
-# ╠═435ff8f4-f10a-4b3f-9fc4-fcd36a25628d
-# ╠═46a96e8b-3e4b-4577-a83a-91c0e717fb19
-# ╠═ff992b5d-c291-4054-8368-49440d9e6335
-# ╠═12742ad9-8a50-4637-b1af-f4c1732b74b2
+# ╠═e5aedd90-2e91-49ee-b1b3-dc555330754d
+# ╠═1cc2a095-567f-4426-b81f-b52977ace8ce
+# ╠═e0788ac8-bf2d-4743-809f-31a5b0e8c0cd
+# ╠═1851fb6b-8388-428f-b02e-b2bd16a4cf2d
+# ╟─41fc1adc-255d-4611-ac05-a0461d524dbc
+# ╠═74e1c56d-b553-406a-b60c-6b1f002e0b6f
 # ╠═450b3f4a-9bc2-49fa-83f5-419d9510bc34
-# ╠═df9081fb-fa99-4868-bdbc-e30b4634504c
-# ╠═d4756e82-3adc-4cd1-a531-d39d042fb995
-# ╠═0d083477-c2f2-4952-9aff-61038ffcc88a
+# ╟─8dd8c375-3cb3-4e5a-9c11-b7cc31f7fe58
+# ╟─3c72f185-dcb7-4d34-a9d8-12e277113fad
+# ╟─0d134e59-f41c-4f7b-a256-939a987fbacc
 # ╠═19d5f7b2-a647-46c5-ac90-a65f3702067b
 # ╠═44f0c327-dfff-44c7-b644-4fec4c779a60
+# ╠═56971cac-4eb4-4ef5-aef1-e3d87e914431
 # ╟─6afaf07d-1d74-42b8-8e2e-6dcdb3c70c6c
 # ╠═82526b61-e6bb-4168-9a14-fb5a964ecbaf
 # ╟─87ecf6a5-f996-4053-8cb3-95bce189f16a
@@ -2407,5 +2432,6 @@ version = "3.5.0+0"
 # ╠═2499d400-ee08-478e-a185-ad1a963a573e
 # ╟─1d82d81d-a9a7-454e-a68b-d5f149a8e871
 # ╟─01db77e2-a2fc-48a9-8f2a-d07a31909058
+# ╠═b33e9ad1-008a-4b2e-885d-b9bbb27191d4
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
