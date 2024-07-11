@@ -15,8 +15,8 @@ cell = (; parsed.lattice, parsed.atoms, parsed.positions)
 # Numerical parameters
 temperature = 0.00225  # Temperature for Fermi-Dirac Smearing.
 kgrid = [2, 4, 4]      # Brillouin-zone discretization
-Ecut = 150       # Plane-wave discretization (energy cutoff)
-tol = 1e-8    # SCF tolerance for density convergence
+Ecut = 150             # Plane-wave discretization (energy cutoff)
+tol = 1e-8             # SCF tolerance for density convergence
 
 # Create supercell
 supercell_size = (2, 1, 1)
@@ -30,12 +30,14 @@ supercell = DFTK.create_supercell(
 function run_scf(ε::T; Ecut=5, tol=1e-8, symmetries=false) where {T}
     (; lattice, atoms, positions) = supercell
     pos = positions + ε * [[1., 0, 0], [0., 0, 0]]
-    model = model_LDA(Matrix{T}(lattice), atoms, pos; temperature, symmetries)
+    model = model_PBE(Matrix{T}(lattice), atoms, pos; temperature, symmetries)
     basis = PlaneWaveBasis(model; Ecut, kgrid)
     response = ResponseOptions(; verbose=true)
     is_converged = DFTK.ScfConvergenceDensity(tol)
     self_consistent_field(basis; is_converged, response)
 end
+
+scfres = run_scf(0.0)
 
 compute_force(ε; kwargs...) = compute_forces_cart(run_scf(ε; kwargs...))
 
@@ -65,14 +67,8 @@ derivative_ε_sym = ForwardDiff.derivative(
     0.0
 )
 
-function compute_force_ca(ε::T; Ecut=5, tol=1e-8, symmetries=false) where {T}
-    (; lattice, atoms, positions) = supercell
-    pos = positions + ε * [[1., 0, 0], [0., 0, 0]]
-    model = model_LDA(Matrix{T}(lattice), atoms, pos; temperature, symmetries)
-    basis = PlaneWaveBasis(model; Ecut, kgrid)
-    response = ResponseOptions(; verbose=true)
-    is_converged = DFTK.ScfConvergenceDensity(tol)
-    scfres = self_consistent_field(basis; is_converged, response)
+function compute_quantities(ε::T; Ecut=5, tol=1e-8, symmetries=false) where {T}
+    scfres = run_scf(ε; Ecut, tol, symmetries)
     forces = compute_forces_cart(scfres)
     ComponentArray(
         forces=forces,
@@ -86,10 +82,10 @@ end
 using DifferentiationInterface
 
 
-for Ecut in 5:5:20
-    scfres = run_scf(0.0; Ecut)  # TODO duplication is not necessary here.
-    F, dF = value_and_derivative(ε -> compute_force_ca(ε; Ecut), AutoForwardDiff(), 0.0)
+for Ecut in 5:5:50
+    @show Ecut
+    scfres = run_scf(0.0; Ecut)  # TODO avoid this duplication.
+    F, dF = value_and_derivative(ε -> compute_quantities(ε; Ecut), AutoForwardDiff(), 0.0)
     save_scfres("scf/Li-BCC-Ecut$Ecut-scfres.jld2", scfres;
                 save_ψ=false, extra_data=Dict("F"=>F, "dF"=>dF))
 end
-
