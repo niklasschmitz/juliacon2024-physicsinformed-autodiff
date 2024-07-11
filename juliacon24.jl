@@ -21,7 +21,6 @@ begin
 	using AtomsIO
 	using JLD2
 	using ComponentArrays
-	using ForwardDiff
 	using CairoMakie
 	using ColorSchemes
 	using PlutoUI
@@ -30,8 +29,19 @@ begin
 	TableOfContents()
 end
 
+# ╔═╡ 495db55e-1b9d-4a81-8061-9e3002cc0e44
+begin
+	using ForwardDiff
+	using DifferentiationInterface
+end
+
 # ╔═╡ f2b612cb-cb58-4a7d-a22d-665ed967f274
 html"<button onclick='present()'>present</button>"
+
+# ╔═╡ 4678e1fc-3d2b-45f1-9647-5915b2e93e7e
+md"""
+$(Resource("https://matmat.org/assets/matmat.png", :width=>200))
+"""
 
 # ╔═╡ 056365c1-c0ba-4751-8207-57539c97168b
 md"""
@@ -42,9 +52,6 @@ Examples from Density Functional Theory in **DFTK.jl**
 - Niklas Schmitz, MATMAT @ EPFL
 - JuliaCon 2024 Eindhoven
 - July 11th, 2024
-
-
-**TODO MatMat logo, DFTK logo**
 """
 
 # ╔═╡ da5955dc-18d2-44cb-9e97-bdd838a2b9a1
@@ -141,14 +148,6 @@ scfres = run_scf(0.0; Ecut)
 # ╔═╡ e0788ac8-bf2d-4743-809f-31a5b0e8c0cd
 scfres.energies
 
-# ╔═╡ 428a918c-f017-4f72-95c2-1e234d66dde6
-md"""
-We can compute forces (which should be zero in this configuration due to symmetry)
-"""
-
-# ╔═╡ 1851fb6b-8388-428f-b02e-b2bd16a4cf2d
-compute_forces_cart(scfres)
-
 # ╔═╡ a33213e4-92ff-41ce-8b9b-fe01c30f0b29
 md"""
 We can also plot the density, here we take a slice along $z=0$ in fractional coordinates.
@@ -162,13 +161,60 @@ let fig = Figure()
 	fig
 end
 
+# ╔═╡ 428a918c-f017-4f72-95c2-1e234d66dde6
+md"""
+We can compute forces (which should be zero in this configuration due to symmetry)
+"""
+
+# ╔═╡ 5b02b630-7596-4b7d-b8b2-df3795867f1c
+compute_forces_cart(scfres)
+
 # ╔═╡ cddcb2f0-0e08-4ca5-9fd0-0790af614f0a
 md"""
 # Implicit Differentiation
 """
 
-# ╔═╡ 495db55e-1b9d-4a81-8061-9e3002cc0e44
+# ╔═╡ 15adb5ab-682c-4055-a702-55a6f1fb23c2
+function compute_quantities(ε; Ecut, tol=1e-8, symmetries=false)
+    scfres = run_scf(ε; Ecut, tol, symmetries)
+    forces = compute_forces_cart(scfres)
+    ComponentArray(
+		ρ=scfres.ρ,
+		forces=forces,
+	)
+end
 
+# ╔═╡ a273cc85-28a3-457c-91a4-2bf3ca0a3d83
+# ╠═╡ disabled = true
+#=╠═╡
+F, dF = DifferentiationInterface.value_and_derivative(
+	ε -> compute_quantities(ε; Ecut=5, tol),  # a very low Ecut, just for demo
+	AutoForwardDiff(),
+	0.0
+)
+  ╠═╡ =#
+
+# ╔═╡ 2377cdea-799f-410d-bcda-5599e226444f
+#=╠═╡
+F.forces
+  ╠═╡ =#
+
+# ╔═╡ 49a5979a-3b28-4de5-b1b8-70992549c9a6
+#=╠═╡
+dF.forces
+  ╠═╡ =#
+
+# ╔═╡ 88825169-ca7f-4fec-adfa-9724061d7b32
+md"""
+PDE-based modeling & numerical methods are built on control (analytic or heuristic) of different approximation errors:
+
+1. **model error**
+2. **discretization error** (finite representation / basis expansion)
+3. **algorithmic error** (finite iterations of iterative solver)
+4. **arithmetic error** (finite bits, FP32/FP64/BFloat16/BigFloat/...)
+
+How to think about this in connection to implicit differentiation for PDE-ML hybrid models?
+"""
 
 # ╔═╡ 41fc1adc-255d-4611-ac05-a0461d524dbc
 md"""# Discretization error"""
@@ -237,7 +283,12 @@ md"### Visualization of the density"
 
 # ╔═╡ 4b986877-5382-413f-bb81-88c9f4ae8766
 md"""
-Discretization parameters must be tuned to a given specific application.
+Disclaimer: Discretization parameters must be tuned to a given specific application.
+"""
+
+# ╔═╡ a4cf3c6f-506d-420f-a69a-18d4d167046a
+md"""
+Let's plot both the density **and** it's derivative with interactive discretization parameter `Ecut`. Try to increase Ecut by the Slider
 """
 
 # ╔═╡ 8389c7a3-8b85-44d3-9d47-39e901d461e6
@@ -266,11 +317,27 @@ end
 
 # ╔═╡ 7e92cecc-8921-46d5-9269-fe407765d612
 md"""
-# Symmetry
+# Bonus: Symmetry
 """
 
 # ╔═╡ 231b6fa9-b51b-4928-9e02-5665624a2ab3
 
+
+# ╔═╡ 9a85bdb3-f3c1-436e-ac12-5ad87916bd16
+md"""
+# DFTK 5 years talk tomorrow:
+
+If this very short talk made you curious, join us for tomorrow's talk:
+
+**DFTK.jl: 5 years of a multidisciplinary electronic-structure code**
+
+Speaker: Michael Herbst
+
+12.07.2024, 12:00–12:30 (Europe/Amsterdam), Function (4.1)
+
+[https://pretalx.com/juliacon2024/talk/WRQE3H/
+](https://pretalx.com/juliacon2024/talk/WRQE3H/)
+"""
 
 # ╔═╡ 1d82d81d-a9a7-454e-a68b-d5f149a8e871
 md"""
@@ -278,26 +345,29 @@ md"""
 
 - DFTK docs [https://docs.dftk.org/stable/](https://docs.dftk.org/stable/)
   - many more examples, pointers to math background on DFT
-- Numerical stability and efficiency of response property calculations in density functional theory
-  - math paper behind the response solver of DFTK
-- Elements of Differentiable Programming
+- [Numerical stability and efficiency of response property calculations in density functional theory](https://link.springer.com/article/10.1007/s11005-023-01645-3)
+  - Eric Cancès, Michael F. Herbst, Gaspard Kemlin, Antoine Levitt, Benjamin Stamm
+  - mathematical theory and numerical implementation inside DFTK response solver
+- [The Elements of Differentiable Programming](https://arxiv.org/abs/2403.14606)
+  - Mathieu Blondel, Vincent Roulet
   - Nice intro to autodiff and implicit differentiation, ML point of view
-- Differentiable Programming for Differential Equations: A Review
-  - overview paper on different AD methods for DiffEq
+- [Differentiable Programming for Differential Equations: A Review](https://arxiv.org/abs/2406.09699)
+  - Facundo Sapienza, Jordi Bolibar, Frank Schäfer, Brian Groenke, Avik Pal, Victor Boussange, Patrick Heimbach, Giles Hooker, Fernando Pérez, Per-Olof Persson, Christopher Rackauckas
+  - overview paper on different AD methods for DiffEq starting from ODE examples
 """
 
 # ╔═╡ 01db77e2-a2fc-48a9-8f2a-d07a31909058
 md"""
 # Acknowledgements
 
+- [DFTK contributors!](https://github.com/JuliaMolSim/DFTK.jl/graphs/contributors) 
+- Julia package authors!
 - The Julia community!
-- DFTK contributors!
 
-**TODO insert logos, MatMat, EPFL, MARVEL, GSOC**
+$(Resource("https://matmat.org/assets/matmat.png", :width=>200))
+![](https://avatars.githubusercontent.com/u/32573519?s=200&v=4)  
+![](https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg88t0cOT6a6PaEfUHit6P0ZkIMv-wPwqrwF42GRpXBxSIdP3qPy2fAoWD_TKlvmzxusj0bVDZZDtKT6iqjVhRcQPwbgg1JzGoeRsBhUeMrJEpxfKjmlSkw0RdsSabTe-wo5pSa9n-PogM/s1405/GSOC+%25231_cropped.jpg)
 """
-
-# ╔═╡ b33e9ad1-008a-4b2e-885d-b9bbb27191d4
-
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -307,6 +377,7 @@ CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 DFTK = "acf6eb54-70d9-11e9-0013-234b7a5f5337"
+DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -318,6 +389,7 @@ CairoMakie = "~0.12.5"
 ColorSchemes = "~3.25.0"
 ComponentArrays = "~0.15.13"
 DFTK = "~0.6.19"
+DifferentiationInterface = "~0.5.7"
 ForwardDiff = "~0.10.36"
 JLD2 = "~0.4.49"
 PlutoUI = "~0.7.59"
@@ -329,7 +401,20 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "7e930f91e2c6a6f350064892cbb96ecf97c7b7d9"
+project_hash = "1c8bbbea1cf4191d454057c194b41db532b0e763"
+
+[[deps.ADTypes]]
+git-tree-sha1 = "7a6b285f217ba92b5b474b783b4c2e8cf8218aaa"
+uuid = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
+version = "1.5.3"
+
+    [deps.ADTypes.extensions]
+    ADTypesChainRulesCoreExt = "ChainRulesCore"
+    ADTypesEnzymeCoreExt = "EnzymeCore"
+
+    [deps.ADTypes.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -792,6 +877,42 @@ deps = ["IrrationalConstants", "LogExpFunctions", "NaNMath", "Random", "SpecialF
 git-tree-sha1 = "23163d55f885173722d1e4cf0f6110cdbaf7e272"
 uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
 version = "1.15.1"
+
+[[deps.DifferentiationInterface]]
+deps = ["ADTypes", "Compat", "DocStringExtensions", "FillArrays", "LinearAlgebra", "PackageExtensionCompat", "SparseArrays", "SparseMatrixColorings"]
+git-tree-sha1 = "695217e97ee1ce0248f4a56c14af88ba33c585fd"
+uuid = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
+version = "0.5.7"
+
+    [deps.DifferentiationInterface.extensions]
+    DifferentiationInterfaceChainRulesCoreExt = "ChainRulesCore"
+    DifferentiationInterfaceDiffractorExt = "Diffractor"
+    DifferentiationInterfaceEnzymeExt = "Enzyme"
+    DifferentiationInterfaceFastDifferentiationExt = "FastDifferentiation"
+    DifferentiationInterfaceFiniteDiffExt = "FiniteDiff"
+    DifferentiationInterfaceFiniteDifferencesExt = "FiniteDifferences"
+    DifferentiationInterfaceForwardDiffExt = "ForwardDiff"
+    DifferentiationInterfacePolyesterForwardDiffExt = "PolyesterForwardDiff"
+    DifferentiationInterfaceReverseDiffExt = "ReverseDiff"
+    DifferentiationInterfaceSymbolicsExt = "Symbolics"
+    DifferentiationInterfaceTapirExt = "Tapir"
+    DifferentiationInterfaceTrackerExt = "Tracker"
+    DifferentiationInterfaceZygoteExt = ["Zygote", "ForwardDiff"]
+
+    [deps.DifferentiationInterface.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    Diffractor = "9f5e2b26-1114-432f-b630-d3fe2085c51c"
+    Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+    FastDifferentiation = "eb9bf01b-bf85-4b60-bf87-ee5de06c00be"
+    FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
+    FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    PolyesterForwardDiff = "98d1487c-24ca-40b6-b7ab-df2af84e126b"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+    Tapir = "07d77754-e150-4737-8c94-cd238a1fb45b"
+    Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
+    Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [[deps.DirectQhull]]
 deps = ["Qhull_jll"]
@@ -2024,6 +2145,12 @@ deps = ["Libdl", "LinearAlgebra", "Random", "Serialization", "SuiteSparse_jll"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 version = "1.10.0"
 
+[[deps.SparseMatrixColorings]]
+deps = ["ADTypes", "Compat", "DocStringExtensions", "LinearAlgebra", "Random", "SparseArrays"]
+git-tree-sha1 = "eed2446b3c3dd58f6ded3168998b8b2cb3fc9229"
+uuid = "0a514795-09f3-496d-8182-132a7b665d35"
+version = "0.3.3"
+
 [[deps.SpecialFunctions]]
 deps = ["IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
 git-tree-sha1 = "2f5d4697f21388cbe1ff299430dd169ef97d7e14"
@@ -2423,6 +2550,7 @@ version = "3.5.0+0"
 
 # ╔═╡ Cell order:
 # ╟─f2b612cb-cb58-4a7d-a22d-665ed967f274
+# ╟─4678e1fc-3d2b-45f1-9647-5915b2e93e7e
 # ╟─056365c1-c0ba-4751-8207-57539c97168b
 # ╠═3c058092-3a21-11ef-059f-77956afb4e38
 # ╟─da5955dc-18d2-44cb-9e97-bdd838a2b9a1
@@ -2437,12 +2565,17 @@ version = "3.5.0+0"
 # ╟─903c47f4-e8d7-4b70-bf91-63a9c0f9e592
 # ╠═1cc2a095-567f-4426-b81f-b52977ace8ce
 # ╠═e0788ac8-bf2d-4743-809f-31a5b0e8c0cd
-# ╟─428a918c-f017-4f72-95c2-1e234d66dde6
-# ╠═1851fb6b-8388-428f-b02e-b2bd16a4cf2d
 # ╟─a33213e4-92ff-41ce-8b9b-fe01c30f0b29
-# ╠═62d64652-4c2e-49fc-a4ec-e74201aabd68
+# ╟─62d64652-4c2e-49fc-a4ec-e74201aabd68
+# ╟─428a918c-f017-4f72-95c2-1e234d66dde6
+# ╠═5b02b630-7596-4b7d-b8b2-df3795867f1c
 # ╟─cddcb2f0-0e08-4ca5-9fd0-0790af614f0a
+# ╠═15adb5ab-682c-4055-a702-55a6f1fb23c2
 # ╠═495db55e-1b9d-4a81-8061-9e3002cc0e44
+# ╠═a273cc85-28a3-457c-91a4-2bf3ca0a3d83
+# ╠═2377cdea-799f-410d-bcda-5599e226444f
+# ╠═49a5979a-3b28-4de5-b1b8-70992549c9a6
+# ╟─88825169-ca7f-4fec-adfa-9724061d7b32
 # ╟─41fc1adc-255d-4611-ac05-a0461d524dbc
 # ╟─1bbfb73e-e7c6-4077-9860-ea9c21fd13de
 # ╠═74e1c56d-b553-406a-b60c-6b1f002e0b6f
@@ -2453,13 +2586,14 @@ version = "3.5.0+0"
 # ╟─0d134e59-f41c-4f7b-a256-939a987fbacc
 # ╟─670ab2c3-7c94-47de-8ace-9b9ef9358dec
 # ╟─4b986877-5382-413f-bb81-88c9f4ae8766
+# ╟─a4cf3c6f-506d-420f-a69a-18d4d167046a
 # ╟─8389c7a3-8b85-44d3-9d47-39e901d461e6
 # ╠═19d5f7b2-a647-46c5-ac90-a65f3702067b
 # ╠═44f0c327-dfff-44c7-b644-4fec4c779a60
 # ╟─7e92cecc-8921-46d5-9269-fe407765d612
 # ╠═231b6fa9-b51b-4928-9e02-5665624a2ab3
+# ╟─9a85bdb3-f3c1-436e-ac12-5ad87916bd16
 # ╟─1d82d81d-a9a7-454e-a68b-d5f149a8e871
 # ╟─01db77e2-a2fc-48a9-8f2a-d07a31909058
-# ╠═b33e9ad1-008a-4b2e-885d-b9bbb27191d4
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
