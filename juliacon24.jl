@@ -162,12 +162,20 @@ let fig = Figure()
 	fig
 end
 
+# ╔═╡ cddcb2f0-0e08-4ca5-9fd0-0790af614f0a
+md"""
+# Implicit Differentiation
+"""
+
+# ╔═╡ 495db55e-1b9d-4a81-8061-9e3002cc0e44
+
+
 # ╔═╡ 41fc1adc-255d-4611-ac05-a0461d524dbc
 md"""# Discretization error"""
 
 # ╔═╡ 1bbfb73e-e7c6-4077-9860-ea9c21fd13de
 md"""
-In the interest of time, in this section we just load some precomputed results here for plotting.
+(In the interest of time, in this section we just load some precomputed results here for plotting...)
 """
 
 # ╔═╡ 74e1c56d-b553-406a-b60c-6b1f002e0b6f
@@ -212,7 +220,7 @@ end
 
 # ╔═╡ 3c72f185-dcb7-4d34-a9d8-12e277113fad
 md"""
-### Increasing discretization
+### Convergence of the energy
 """
 
 # ╔═╡ 0d134e59-f41c-4f7b-a256-939a987fbacc
@@ -224,17 +232,26 @@ let fig = Figure()
 	fig
 end
 
+# ╔═╡ 670ab2c3-7c94-47de-8ace-9b9ef9358dec
+md"### Visualization of the density"
+
 # ╔═╡ 4b986877-5382-413f-bb81-88c9f4ae8766
 md"""
-Discretization parameters must be tuned to a given specific application. Here we just illustrate visually the tuning of the plane-wave cutoff `Ecut` and the corresponding ground state density and its variation.
+Discretization parameters must be tuned to a given specific application.
+"""
+
+# ╔═╡ 8389c7a3-8b85-44d3-9d47-39e901d461e6
+md"""
+**Computer: Enhance**
 """
 
 # ╔═╡ 19d5f7b2-a647-46c5-ac90-a65f3702067b
-@bind Ecut_plot PlutoUI.Slider(Ecuts; show_value=true)
+@bind Ecut_slider PlutoUI.Slider(Ecuts; show_value=true)
 
 # ╔═╡ 44f0c327-dfff-44c7-b644-4fec4c779a60
 let fig = Figure()
-	row = precomputed[findfirst(row -> row.scfres.basis.Ecut==Ecut_plot, precomputed)]
+	idx = findfirst(row -> row.scfres.basis.Ecut==Ecut_slider, precomputed)
+	row = precomputed[idx]
 	
 	ax = Makie.Axis(fig[1,1][1,1], title=L"\rho")
 	hmap = heatmap!(ax, row.scfres.ρ[:,:,1], colorscale=log10, colorrange=(1e-3, 1))
@@ -246,6 +263,14 @@ let fig = Figure()
 	
 	fig
 end
+
+# ╔═╡ 7e92cecc-8921-46d5-9269-fe407765d612
+md"""
+# Symmetry
+"""
+
+# ╔═╡ 231b6fa9-b51b-4928-9e02-5665624a2ab3
+
 
 # ╔═╡ 1d82d81d-a9a7-454e-a68b-d5f149a8e871
 md"""
@@ -2416,18 +2441,24 @@ version = "3.5.0+0"
 # ╠═1851fb6b-8388-428f-b02e-b2bd16a4cf2d
 # ╟─a33213e4-92ff-41ce-8b9b-fe01c30f0b29
 # ╠═62d64652-4c2e-49fc-a4ec-e74201aabd68
+# ╟─cddcb2f0-0e08-4ca5-9fd0-0790af614f0a
+# ╠═495db55e-1b9d-4a81-8061-9e3002cc0e44
 # ╟─41fc1adc-255d-4611-ac05-a0461d524dbc
 # ╟─1bbfb73e-e7c6-4077-9860-ea9c21fd13de
 # ╠═74e1c56d-b553-406a-b60c-6b1f002e0b6f
 # ╠═450b3f4a-9bc2-49fa-83f5-419d9510bc34
 # ╟─2fa4f7d4-de38-47fb-99d3-ef9075c5ae6f
-# ╠═8dd8c375-3cb3-4e5a-9c11-b7cc31f7fe58
+# ╟─8dd8c375-3cb3-4e5a-9c11-b7cc31f7fe58
 # ╟─3c72f185-dcb7-4d34-a9d8-12e277113fad
 # ╟─0d134e59-f41c-4f7b-a256-939a987fbacc
+# ╟─670ab2c3-7c94-47de-8ace-9b9ef9358dec
 # ╟─4b986877-5382-413f-bb81-88c9f4ae8766
+# ╟─8389c7a3-8b85-44d3-9d47-39e901d461e6
 # ╠═19d5f7b2-a647-46c5-ac90-a65f3702067b
 # ╠═44f0c327-dfff-44c7-b644-4fec4c779a60
-# ╠═1d82d81d-a9a7-454e-a68b-d5f149a8e871
+# ╟─7e92cecc-8921-46d5-9269-fe407765d612
+# ╠═231b6fa9-b51b-4928-9e02-5665624a2ab3
+# ╟─1d82d81d-a9a7-454e-a68b-d5f149a8e871
 # ╟─01db77e2-a2fc-48a9-8f2a-d07a31909058
 # ╠═b33e9ad1-008a-4b2e-885d-b9bbb27191d4
 # ╟─00000000-0000-0000-0000-000000000001
