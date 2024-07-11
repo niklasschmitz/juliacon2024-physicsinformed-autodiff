@@ -19,8 +19,6 @@ begin
 	using DFTK
 	using LinearAlgebra
 	using AtomsIO
-	using Unitful
-	using UnitfulAtomic
 	using JLD2
 	using ComponentArrays
 	using ForwardDiff
@@ -116,7 +114,7 @@ begin
 	    supercell_size
 	)
 	
-	# Numerical parameters
+	# Numerical parameters (Warning: these are not converged, just examples)
 	temperature = 0.00225  # Temperature for Fermi-Dirac Smearing.
 	kgrid = [2, 4, 4]      # Brillouin-zone discretization
 	Ecut = 30   		   # Plane-wave discretization (energy cutoff)
@@ -134,17 +132,42 @@ function run_scf(ε::T; Ecut, tol=1e-8, symmetries=false) where {T}
     self_consistent_field(basis; is_converged, response)
 end
 
+# ╔═╡ 903c47f4-e8d7-4b70-bf91-63a9c0f9e592
+md"""### Solve"""
+
 # ╔═╡ 1cc2a095-567f-4426-b81f-b52977ace8ce
 scfres = run_scf(0.0; Ecut)
 
 # ╔═╡ e0788ac8-bf2d-4743-809f-31a5b0e8c0cd
 scfres.energies
 
+# ╔═╡ 428a918c-f017-4f72-95c2-1e234d66dde6
+md"""
+We can compute forces (which should be zero in this configuration due to symmetry)
+"""
+
 # ╔═╡ 1851fb6b-8388-428f-b02e-b2bd16a4cf2d
 compute_forces_cart(scfres)
 
+# ╔═╡ a33213e4-92ff-41ce-8b9b-fe01c30f0b29
+md"""
+We can also plot the density, here we take a slice along $z=0$ in fractional coordinates.
+"""
+
+# ╔═╡ 62d64652-4c2e-49fc-a4ec-e74201aabd68
+let fig = Figure()
+	ax = Makie.Axis(fig[1,1][1,1], title=L"\rho", xlabel="x", ylabel="y")
+	hmap = heatmap!(ax, scfres.ρ[:,:,1], colorscale=log10, colorrange=(1e-3, 1))
+	Colorbar(fig[1,1][1,2], hmap)
+	fig
+end
+
 # ╔═╡ 41fc1adc-255d-4611-ac05-a0461d524dbc
-md"""### Aside: Precomputed results
+md"""# Discretization error"""
+
+# ╔═╡ 1bbfb73e-e7c6-4077-9860-ea9c21fd13de
+md"""
+In the interest of time, in this section we just load some precomputed results here for plotting.
 """
 
 # ╔═╡ 74e1c56d-b553-406a-b60c-6b1f002e0b6f
@@ -161,13 +184,20 @@ precomputed = sort(
 # ╔═╡ 450b3f4a-9bc2-49fa-83f5-419d9510bc34
 Ecuts = map(row -> row.scfres.basis.Ecut, precomputed)
 
+# ╔═╡ 2fa4f7d4-de38-47fb-99d3-ef9075c5ae6f
+md"""
+All the different resolutions converge similarly nicely in this example.
+"""
+
 # ╔═╡ 8dd8c375-3cb3-4e5a-9c11-b7cc31f7fe58
 let fig = Figure(size=(600,300))
 	cmap = cgrad(colorschemes[:thermal], length(Ecuts), categorical=true, rev=true)
 
-	ax1 = Makie.Axis(fig[1,1][1,1], yscale=log10, xlabel="iteration", ylabel="ρ error")
+	ax1 = Makie.Axis(fig[1,1][1,1], yscale=log10, xlabel="iteration", ylabel="total energy error (Ha)")
+	
 	for (i, row) in enumerate(precomputed)
-		scatterlines!(ax1, row.scfres.history_Δρ, color=cmap[i])
+		e = row.scfres.history_Etot
+		scatterlines!(ax1, abs.(e[1:end-1] .- e[end]), color=cmap[i])
 	end
 
 	ax2 = Makie.Axis(fig[1,2][1,1], yscale=log10, xlabel="iteration", ylabel="ρ error")
@@ -194,6 +224,11 @@ let fig = Figure()
 	fig
 end
 
+# ╔═╡ 4b986877-5382-413f-bb81-88c9f4ae8766
+md"""
+Discretization parameters must be tuned to a given specific application. Here we just illustrate visually the tuning of the plane-wave cutoff `Ecut` and the corresponding ground state density and its variation.
+"""
+
 # ╔═╡ 19d5f7b2-a647-46c5-ac90-a65f3702067b
 @bind Ecut_plot PlutoUI.Slider(Ecuts; show_value=true)
 
@@ -202,61 +237,28 @@ let fig = Figure()
 	row = precomputed[findfirst(row -> row.scfres.basis.Ecut==Ecut_plot, precomputed)]
 	
 	ax = Makie.Axis(fig[1,1][1,1], title=L"\rho")
-	hmap = heatmap!(ax, row.scfres.ρ[:,:,1], colorscale=log10)
+	hmap = heatmap!(ax, row.scfres.ρ[:,:,1], colorscale=log10, colorrange=(1e-3, 1))
 	Colorbar(fig[1,1][1,2], hmap)
 	
 	ax2 = Makie.Axis(fig[2,1][1,1], title=L"\delta\rho")
-	hmap2 = heatmap!(ax2, row.dF.ρ[:,:,1])
+	hmap2 = heatmap!(ax2, row.dF.ρ[:,:,1], colorrange=(-1,1))
 	Colorbar(fig[2,1][1,2], hmap2)
 	
 	fig
 end
 
-# ╔═╡ 56971cac-4eb4-4ef5-aef1-e3d87e914431
-row.dF.ρ
-
-# ╔═╡ 6afaf07d-1d74-42b8-8e2e-6dcdb3c70c6c
-md"""
-## A quantity of interest
-"""
-
-# ╔═╡ 82526b61-e6bb-4168-9a14-fb5a964ecbaf
-
-
-# ╔═╡ 87ecf6a5-f996-4053-8cb3-95bce189f16a
-md"""
-# Differentiation
-"""
-
-# ╔═╡ ce70f4dd-24c0-4f2f-8115-e0a77c6fef48
-md"""
-## Finite Differences
-
-**step size dilemma**
-"""
-
-# ╔═╡ df59cf0d-602a-4cc8-8ffd-32fa1beeb891
-md"""
-## Implicit Differentiation & numerical error
-"""
-
-# ╔═╡ e7dc03cf-977b-438d-abcf-98aac3d48d7d
-md"""
-## Symmetry
-"""
-
-# ╔═╡ 2499d400-ee08-478e-a185-ad1a963a573e
-## compute derivative of forces in 2x1x1 supercell (+displacement). Then symmetries=true should give a wrong answer, and symmetries=false correct (but expensive)
-
 # ╔═╡ 1d82d81d-a9a7-454e-a68b-d5f149a8e871
 md"""
 # Further Reading
 
-- DFTK docs
-- Elements of Differentiable Programming
+- DFTK docs [https://docs.dftk.org/stable/](https://docs.dftk.org/stable/)
+  - many more examples, pointers to math background on DFT
 - Numerical stability and efficiency of response property calculations in density functional theory
+  - math paper behind the response solver of DFTK
+- Elements of Differentiable Programming
+  - Nice intro to autodiff and implicit differentiation, ML point of view
 - Differentiable Programming for Differential Equations: A Review
-
+  - overview paper on different AD methods for DiffEq
 """
 
 # ╔═╡ 01db77e2-a2fc-48a9-8f2a-d07a31909058
@@ -284,8 +286,6 @@ ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
-Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
-UnitfulAtomic = "a7773ee8-282e-5fa2-be4e-bd808c38a91a"
 
 [compat]
 AtomsIO = "~0.2.3"
@@ -296,8 +296,6 @@ DFTK = "~0.6.19"
 ForwardDiff = "~0.10.36"
 JLD2 = "~0.4.49"
 PlutoUI = "~0.7.59"
-Unitful = "~1.20.0"
-UnitfulAtomic = "~1.0.0"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -306,7 +304,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "3d8c78d5ef2a9bd14719d128766d77854c7bca9a"
+project_hash = "7e930f91e2c6a6f350064892cbb96ecf97c7b7d9"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -2411,26 +2409,25 @@ version = "3.5.0+0"
 # ╟─edfbc430-64e1-4faa-b0f1-a63c50bf0744
 # ╠═c47feb25-4f65-4d9c-ab77-ef10bab65144
 # ╠═e5aedd90-2e91-49ee-b1b3-dc555330754d
+# ╟─903c47f4-e8d7-4b70-bf91-63a9c0f9e592
 # ╠═1cc2a095-567f-4426-b81f-b52977ace8ce
 # ╠═e0788ac8-bf2d-4743-809f-31a5b0e8c0cd
+# ╟─428a918c-f017-4f72-95c2-1e234d66dde6
 # ╠═1851fb6b-8388-428f-b02e-b2bd16a4cf2d
+# ╟─a33213e4-92ff-41ce-8b9b-fe01c30f0b29
+# ╠═62d64652-4c2e-49fc-a4ec-e74201aabd68
 # ╟─41fc1adc-255d-4611-ac05-a0461d524dbc
+# ╟─1bbfb73e-e7c6-4077-9860-ea9c21fd13de
 # ╠═74e1c56d-b553-406a-b60c-6b1f002e0b6f
 # ╠═450b3f4a-9bc2-49fa-83f5-419d9510bc34
-# ╟─8dd8c375-3cb3-4e5a-9c11-b7cc31f7fe58
+# ╟─2fa4f7d4-de38-47fb-99d3-ef9075c5ae6f
+# ╠═8dd8c375-3cb3-4e5a-9c11-b7cc31f7fe58
 # ╟─3c72f185-dcb7-4d34-a9d8-12e277113fad
 # ╟─0d134e59-f41c-4f7b-a256-939a987fbacc
+# ╟─4b986877-5382-413f-bb81-88c9f4ae8766
 # ╠═19d5f7b2-a647-46c5-ac90-a65f3702067b
 # ╠═44f0c327-dfff-44c7-b644-4fec4c779a60
-# ╠═56971cac-4eb4-4ef5-aef1-e3d87e914431
-# ╟─6afaf07d-1d74-42b8-8e2e-6dcdb3c70c6c
-# ╠═82526b61-e6bb-4168-9a14-fb5a964ecbaf
-# ╟─87ecf6a5-f996-4053-8cb3-95bce189f16a
-# ╟─ce70f4dd-24c0-4f2f-8115-e0a77c6fef48
-# ╟─df59cf0d-602a-4cc8-8ffd-32fa1beeb891
-# ╟─e7dc03cf-977b-438d-abcf-98aac3d48d7d
-# ╠═2499d400-ee08-478e-a185-ad1a963a573e
-# ╟─1d82d81d-a9a7-454e-a68b-d5f149a8e871
+# ╠═1d82d81d-a9a7-454e-a68b-d5f149a8e871
 # ╟─01db77e2-a2fc-48a9-8f2a-d07a31909058
 # ╠═b33e9ad1-008a-4b2e-885d-b9bbb27191d4
 # ╟─00000000-0000-0000-0000-000000000001
