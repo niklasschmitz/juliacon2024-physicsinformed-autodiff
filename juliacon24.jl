@@ -54,6 +54,18 @@ Examples from Density Functional Theory in **DFTK.jl**
 - July 11th, 2024
 """
 
+# ╔═╡ d06b12dd-67a9-4b6b-bb49-b41c5b6b033c
+md"""
+**Differentiable Programming for PDE-based modelling** is used as an umbrella term for the combination of
+- automatic differentiation (AD)
+- partial differential equations
+- numerical methods
+with many applications in inverse problems, uncertainty propagation, etc. 
+
+
+**The key ingredient:** derivatives of complicated, mathematically structured models (including optimization, PDE solving, simulation, ...)
+"""
+
 # ╔═╡ da5955dc-18d2-44cb-9e97-bdd838a2b9a1
 md"""
 # Example: Lithium crystal
@@ -86,17 +98,25 @@ md"""
 ### Density Functional Theory
 """
 
-# ╔═╡ c10a0acf-058d-43a7-b888-1f24e5daf3c2
+# ╔═╡ 94566fd5-e464-4a55-8a31-5de6f863d0c6
 md"""
+A forward model:
 ```math
-\begin{align}
-\min \left\{  
-E^\text{KS} (\Phi)\; \mid\; \Phi = (\phi_1,\dotsc,\phi_N) \in \left(H^1_\#\right(\Omega))^N,
-\int_\Omega \phi_i \phi_j = \delta_{ij}
-\right\}\\
-E^\text{KS}(\Phi) := \sum_{i=1}^N \int_\Omega |\nabla\phi_i|^2 + \int_\Omega v\rho_\Phi + E_\text{Hxc}(\rho_\Phi)
-\end{align}
+\theta \mapsto V_\text{ext} \mapsto \rho \mapsto y
 ```
+
+where
+- PDE model parameters $\theta$
+- external potential $V_\text{ext}$
+- total density of electrons $\rho: \mathbb{R}^3 \to \mathbb{R}$
+- some postprocessed quantity of interest $y$ (e.g. energies, forces, band gaps, ...)
+
+
+The are very different kinds of **model parameters** in a DFT. The most important ones:
+- the physical systems of atoms (lattice, atoms, positions)
+- pseudopotentials
+- exchange-correlation functional
+and **also numerical parameters**.
 """
 
 # ╔═╡ edfbc430-64e1-4faa-b0f1-a63c50bf0744
@@ -174,6 +194,26 @@ md"""
 # Implicit Differentiation
 """
 
+# ╔═╡ c10a0acf-058d-43a7-b888-1f24e5daf3c2
+# md"""
+# ```math
+# \begin{align}
+# \min \left\{  
+# E^\text{KS} (\Phi)\; \mid\; \Phi = (\phi_1,\dotsc,\phi_N) \in \left(H^1_\#\right(\Omega))^N,
+# \int_\Omega \phi_i \phi_j = \delta_{ij}
+# \right\}\\
+# E^\text{KS}(\Phi) := \sum_{i=1}^N \int_\Omega |\nabla\phi_i|^2 + \int_\Omega v\rho_\Phi + E_\text{Hxc}(\rho_\Phi)
+# \end{align}
+# ```
+# """
+md"""
+For details, see:
+
+Eric Cancès, Michael F. Herbst, Gaspard Kemlin, Antoine Levitt, Benjamin Stamm. Numerical stability and efficiency of response property calculations in density functional theory. Lett Math Phys 113, 21 (2023). [https://doi.org/10.1007/s11005-023-01645-3](https://doi.org/10.1007/s11005-023-01645-3)
+
+  - mathematical theory and numerical implementation inside DFTK response solver
+"""
+
 # ╔═╡ 15adb5ab-682c-4055-a702-55a6f1fb23c2
 function compute_quantities(ε; Ecut, tol=1e-8, symmetries=false)
     scfres = run_scf(ε; Ecut, tol, symmetries)
@@ -185,24 +225,27 @@ function compute_quantities(ε; Ecut, tol=1e-8, symmetries=false)
 end
 
 # ╔═╡ a273cc85-28a3-457c-91a4-2bf3ca0a3d83
-# ╠═╡ disabled = true
-#=╠═╡
 F, dF = DifferentiationInterface.value_and_derivative(
 	ε -> compute_quantities(ε; Ecut=5, tol),  # a very low Ecut, just for demo
 	AutoForwardDiff(),
 	0.0
 )
-  ╠═╡ =#
 
 # ╔═╡ 2377cdea-799f-410d-bcda-5599e226444f
-#=╠═╡
 F.forces
-  ╠═╡ =#
+
+# ╔═╡ ece2e067-75a8-49ae-b9fb-f2392351cf41
+md"""
+Now we also obtained the Jacobian of the forces with respect to the perturbation:
+"""
 
 # ╔═╡ 49a5979a-3b28-4de5-b1b8-70992549c9a6
-#=╠═╡
 dF.forces
-  ╠═╡ =#
+
+# ╔═╡ 3674c1b8-fc92-4520-9ac4-9a81d5900d8c
+md"""
+So far, so good.
+"""
 
 # ╔═╡ 88825169-ca7f-4fec-adfa-9724061d7b32
 md"""
@@ -278,8 +321,25 @@ let fig = Figure()
 	fig
 end
 
+# ╔═╡ 5d226c69-a2db-4fee-a56e-a773ec4701dd
+md"""
+Now we plot the error of the derivative of the `forces[1][1]` entry, against the Ecut=150 reference
+"""
+
+# ╔═╡ 6a1f7a19-db10-4b16-9762-fdc6d2a2aae3
+let fig = Figure()
+	ax = Makie.Axis(fig[1,1], xlabel="Ecut (Ha)", ylabel="Force[1][1] derivative error (a.u.)", yscale=log10, xticks=Ecuts)
+	dforces = [row.dF.forces[1][1] for row in precomputed]
+
+	norm2(x) = sum(abs2, x)
+	
+	scatterlines!(ax, Ecuts[1:end-1], abs.(dforces[1:end-1] .- dforces[end]), linestyle=:dash)
+	
+	fig
+end
+
 # ╔═╡ 670ab2c3-7c94-47de-8ace-9b9ef9358dec
-md"### Visualization of the density"
+md"### Sensitivity of the density"
 
 # ╔═╡ 4b986877-5382-413f-bb81-88c9f4ae8766
 md"""
@@ -288,7 +348,7 @@ Disclaimer: Discretization parameters must be tuned to a given specific applicat
 
 # ╔═╡ a4cf3c6f-506d-420f-a69a-18d4d167046a
 md"""
-Let's plot both the density **and** it's derivative with interactive discretization parameter `Ecut`. Try to increase Ecut by the Slider
+Let's plot both the density **and** it's derivative with interactive discretization parameter `Ecut`. Again we take a slice along $z=0$ in fractional coordinates.. Try to increase Ecut by the Slider
 """
 
 # ╔═╡ 8389c7a3-8b85-44d3-9d47-39e901d461e6
@@ -317,15 +377,65 @@ end
 
 # ╔═╡ 7e92cecc-8921-46d5-9269-fe407765d612
 md"""
-# Bonus: Symmetry
+# Bonus: Symmetry (breaking) & AD
 """
 
-# ╔═╡ 231b6fa9-b51b-4928-9e02-5665624a2ab3
+# ╔═╡ 59bee42b-23a9-41dd-8dee-9ca14b1cce49
+md"""
+DFTK docs on crystal symmetries: [https://docs.dftk.org/stable/developer/symmetries/](https://docs.dftk.org/stable/developer/symmetries/)
+"""
 
+# ╔═╡ 1a27e07c-4bca-418f-ada8-c19d74d86b8d
+scfres0_sym = compute_quantities(0.; Ecut=5, symmetries=true)
+
+# ╔═╡ 231b6fa9-b51b-4928-9e02-5665624a2ab3
+md"""
+Large-scale PDE solvers (esp. in DFT) often do a symmetry analysis before-hand and then solve an equivalent, possibly reduced PDE. With a "naive" application of AD (even of implicit differentiation) if done **incorrectly**™, and lead to **subtle bugs**™.
+"""
+
+# ╔═╡ dbb629bd-887c-448a-b338-be84470987bf
+derivative_ε_sym = let ε = 1e-5
+    (compute_quantities(ε;  Ecut=5, symmetries=true).forces
+   - compute_quantities(0.; Ecut=5, symmetries=true).forces) / ε
+end
+
+# ╔═╡ cd9744f0-3777-48f1-a67d-98df96100431
+derivative_ε_sym_forwarddiff = ForwardDiff.derivative(
+    ε -> compute_quantities(ε; Ecut=5, symmetries=true), 
+    0.0
+)
+
+# ╔═╡ 9322b44e-71d3-4979-ae1f-54bb132ea39a
+md"""
+**Force derivatives are then wrong.** Disclaimer: This is not ForwardDiff's fault, but
+"""
+
+# ╔═╡ 7ac6c69e-2e5b-40c1-b369-92c75e4985bd
+derivative_ε_sym_forwarddiff.forces
+
+# ╔═╡ 60399608-73ba-4ae7-9d80-c58c292fcd63
+let fig = Figure()
+	ax = Makie.Axis(fig[1,1][1,1], title=L"\rho", xlabel="x", ylabel="y")
+	hmap = heatmap!(
+		ax, 
+		derivative_ε_sym_forwarddiff.ρ[:,:,1], 
+	)
+	Colorbar(fig[1,1][1,2], hmap)
+	fig
+end
+
+# ╔═╡ acd729cc-e43c-4a1b-81fc-93d74c603172
+md"""
+This is understandable: The perturbation, even though inifinitesimal, breaks the symmetry of the system when it comes to derivatives.
+
+**Current solution:** Disable symmetries manually, when using ForwardDiff with a **symmetry-breaking perurbation**.
+
+Possible future work: Improve the symmetry analysis to also analyse the symmetries of the perturbation coming in from the autodiff system. This would need to happen inside a custom rule.
+"""
 
 # ╔═╡ 9a85bdb3-f3c1-436e-ac12-5ad87916bd16
 md"""
-# DFTK 5 years talk tomorrow:
+# 5 Years DFTK.jl: talk tomorrow
 
 If this very short talk made you curious, join us for tomorrow's talk:
 
@@ -2553,12 +2663,13 @@ version = "3.5.0+0"
 # ╟─4678e1fc-3d2b-45f1-9647-5915b2e93e7e
 # ╟─056365c1-c0ba-4751-8207-57539c97168b
 # ╠═3c058092-3a21-11ef-059f-77956afb4e38
+# ╟─d06b12dd-67a9-4b6b-bb49-b41c5b6b033c
 # ╟─da5955dc-18d2-44cb-9e97-bdd838a2b9a1
 # ╟─e4a605be-64d2-41b3-a9df-6404e8546acb
 # ╟─d97e9f68-2bc9-4e2e-808c-9c2afb625b99
 # ╟─73e28885-7dd1-4b8d-b1d5-160ba24c5d8f
 # ╟─1a478d51-3045-4750-9259-7b5cca7e2fa9
-# ╟─c10a0acf-058d-43a7-b888-1f24e5daf3c2
+# ╟─94566fd5-e464-4a55-8a31-5de6f863d0c6
 # ╟─edfbc430-64e1-4faa-b0f1-a63c50bf0744
 # ╠═c47feb25-4f65-4d9c-ab77-ef10bab65144
 # ╠═e5aedd90-2e91-49ee-b1b3-dc555330754d
@@ -2570,11 +2681,14 @@ version = "3.5.0+0"
 # ╟─428a918c-f017-4f72-95c2-1e234d66dde6
 # ╠═5b02b630-7596-4b7d-b8b2-df3795867f1c
 # ╟─cddcb2f0-0e08-4ca5-9fd0-0790af614f0a
+# ╟─c10a0acf-058d-43a7-b888-1f24e5daf3c2
 # ╠═15adb5ab-682c-4055-a702-55a6f1fb23c2
 # ╠═495db55e-1b9d-4a81-8061-9e3002cc0e44
 # ╠═a273cc85-28a3-457c-91a4-2bf3ca0a3d83
 # ╠═2377cdea-799f-410d-bcda-5599e226444f
+# ╟─ece2e067-75a8-49ae-b9fb-f2392351cf41
 # ╠═49a5979a-3b28-4de5-b1b8-70992549c9a6
+# ╟─3674c1b8-fc92-4520-9ac4-9a81d5900d8c
 # ╟─88825169-ca7f-4fec-adfa-9724061d7b32
 # ╟─41fc1adc-255d-4611-ac05-a0461d524dbc
 # ╟─1bbfb73e-e7c6-4077-9860-ea9c21fd13de
@@ -2583,15 +2697,25 @@ version = "3.5.0+0"
 # ╟─2fa4f7d4-de38-47fb-99d3-ef9075c5ae6f
 # ╟─8dd8c375-3cb3-4e5a-9c11-b7cc31f7fe58
 # ╟─3c72f185-dcb7-4d34-a9d8-12e277113fad
-# ╟─0d134e59-f41c-4f7b-a256-939a987fbacc
+# ╠═0d134e59-f41c-4f7b-a256-939a987fbacc
+# ╟─5d226c69-a2db-4fee-a56e-a773ec4701dd
+# ╟─6a1f7a19-db10-4b16-9762-fdc6d2a2aae3
 # ╟─670ab2c3-7c94-47de-8ace-9b9ef9358dec
 # ╟─4b986877-5382-413f-bb81-88c9f4ae8766
 # ╟─a4cf3c6f-506d-420f-a69a-18d4d167046a
 # ╟─8389c7a3-8b85-44d3-9d47-39e901d461e6
 # ╠═19d5f7b2-a647-46c5-ac90-a65f3702067b
-# ╠═44f0c327-dfff-44c7-b644-4fec4c779a60
+# ╟─44f0c327-dfff-44c7-b644-4fec4c779a60
 # ╟─7e92cecc-8921-46d5-9269-fe407765d612
-# ╠═231b6fa9-b51b-4928-9e02-5665624a2ab3
+# ╟─59bee42b-23a9-41dd-8dee-9ca14b1cce49
+# ╠═1a27e07c-4bca-418f-ada8-c19d74d86b8d
+# ╟─231b6fa9-b51b-4928-9e02-5665624a2ab3
+# ╠═dbb629bd-887c-448a-b338-be84470987bf
+# ╠═cd9744f0-3777-48f1-a67d-98df96100431
+# ╟─9322b44e-71d3-4979-ae1f-54bb132ea39a
+# ╠═7ac6c69e-2e5b-40c1-b369-92c75e4985bd
+# ╠═60399608-73ba-4ae7-9d80-c58c292fcd63
+# ╟─acd729cc-e43c-4a1b-81fc-93d74c603172
 # ╟─9a85bdb3-f3c1-436e-ac12-5ad87916bd16
 # ╟─1d82d81d-a9a7-454e-a68b-d5f149a8e871
 # ╟─01db77e2-a2fc-48a9-8f2a-d07a31909058
