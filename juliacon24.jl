@@ -207,7 +207,10 @@ md"""
 # ```
 # """
 md"""
-For details, see:
+Broadly speaking, using **implicit automatic differentiation** means obtaining the derivative the solution of a numerical method, again by a controlled numerical method.
+
+
+For details about the case for DFT here, see:
 
 Eric Cancès, Michael F. Herbst, Gaspard Kemlin, Antoine Levitt, Benjamin Stamm. Numerical stability and efficiency of response property calculations in density functional theory. Lett Math Phys 113, 21 (2023). [https://doi.org/10.1007/s11005-023-01645-3](https://doi.org/10.1007/s11005-023-01645-3)
 
@@ -2672,6 +2675,7 @@ version = "3.5.0+0"
 # ╟─94566fd5-e464-4a55-8a31-5de6f863d0c6
 # ╟─edfbc430-64e1-4faa-b0f1-a63c50bf0744
 # ╠═c47feb25-4f65-4d9c-ab77-ef10bab65144
+# ╠═b5e6500b-2a46-4e6b-b940-be9c65f5dc7e
 # ╠═e5aedd90-2e91-49ee-b1b3-dc555330754d
 # ╟─903c47f4-e8d7-4b70-bf91-63a9c0f9e592
 # ╠═1cc2a095-567f-4426-b81f-b52977ace8ce
