@@ -15,9 +15,9 @@ cell = (; parsed.lattice, parsed.atoms, parsed.positions)
 
 # Numerical parameters
 temperature = 0.00225  # Temperature for Fermi-Dirac Smearing.
-kgrid = [2, 4, 4]      # Brillouin-zone discretization
-Ecut = 150             # Plane-wave discretization (energy cutoff)
-tol = 1e-8             # SCF tolerance for density convergence
+kgrid = (2, 4, 4)      # Brillouin-zone discretization
+# Ecut = 150           # Plane-wave discretization (energy cutoff)
+# tol = 1e-8           # SCF tolerance for density convergence
 
 # Create supercell
 supercell_size = (2, 1, 1)
