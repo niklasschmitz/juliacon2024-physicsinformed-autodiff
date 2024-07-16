@@ -418,7 +418,7 @@ derivative_ε_sym_forwarddiff.forces
 
 # ╔═╡ 60399608-73ba-4ae7-9d80-c58c292fcd63
 let fig = Figure()
-	ax = Makie.Axis(fig[1,1][1,1], title=L"\rho", xlabel="x", ylabel="y")
+	ax = Makie.Axis(fig[1,1][1,1], title=L"\delta\rho", xlabel="x", ylabel="y")
 	hmap = heatmap!(
 		ax, 
 		derivative_ε_sym_forwarddiff.ρ[:,:,1], 
@@ -2675,7 +2675,6 @@ version = "3.5.0+0"
 # ╟─94566fd5-e464-4a55-8a31-5de6f863d0c6
 # ╟─edfbc430-64e1-4faa-b0f1-a63c50bf0744
 # ╠═c47feb25-4f65-4d9c-ab77-ef10bab65144
-# ╠═b5e6500b-2a46-4e6b-b940-be9c65f5dc7e
 # ╠═e5aedd90-2e91-49ee-b1b3-dc555330754d
 # ╟─903c47f4-e8d7-4b70-bf91-63a9c0f9e592
 # ╠═1cc2a095-567f-4426-b81f-b52977ace8ce
@@ -2699,7 +2698,7 @@ version = "3.5.0+0"
 # ╠═74e1c56d-b553-406a-b60c-6b1f002e0b6f
 # ╠═450b3f4a-9bc2-49fa-83f5-419d9510bc34
 # ╟─2fa4f7d4-de38-47fb-99d3-ef9075c5ae6f
-# ╟─8dd8c375-3cb3-4e5a-9c11-b7cc31f7fe58
+# ╠═8dd8c375-3cb3-4e5a-9c11-b7cc31f7fe58
 # ╟─3c72f185-dcb7-4d34-a9d8-12e277113fad
 # ╠═0d134e59-f41c-4f7b-a256-939a987fbacc
 # ╟─5d226c69-a2db-4fee-a56e-a773ec4701dd
