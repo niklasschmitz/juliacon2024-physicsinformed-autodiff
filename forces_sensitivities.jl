@@ -4,8 +4,9 @@ using LinearAlgebra
 using JLD2
 using ForwardDiff
 using ComponentArrays
-
+using DifferentiationInterface
 DFTK.setup_threading()
+
 
 system = load_system("./Li-BCC.xsf")
 system = attach_psp(system, Dict(:Li => "hgh/lda/Li-q3"))
@@ -27,9 +28,9 @@ supercell = DFTK.create_supercell(
     supercell_size
 )
 
-function run_scf(ε::T; Ecut=5, tol=1e-8, symmetries=false) where {T}
+function run_scf(ε::T; Ecut, tol=1e-8, symmetries=false) where {T}
     (; lattice, atoms, positions) = supercell
-    pos = positions + ε * [[1., 0, 0], [0., 0, 0]]
+    pos = positions + ε * [[1.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
     model = model_PBE(Matrix{T}(lattice), atoms, pos; temperature, symmetries)
     basis = PlaneWaveBasis(model; Ecut, kgrid)
     response = ResponseOptions(; verbose=true)
@@ -37,37 +38,7 @@ function run_scf(ε::T; Ecut=5, tol=1e-8, symmetries=false) where {T}
     self_consistent_field(basis; is_converged, response)
 end
 
-scfres = run_scf(0.0)
-
-compute_force(ε; kwargs...) = compute_forces_cart(run_scf(ε; kwargs...))
-
-F = compute_force(0.0)
-
-derivative_ε_fd = let ε = 1e-5
-    (compute_force(ε) - F) / ε
-end
-# TODO also add central difference
-derivative_ε_fd_central = let ε = 1e-5
-    (compute_force(ε) - compute_force(-ε)) / 2ε
-end
-
-scfres = run_scf(0.1)
-save_scfres("scfres_dummy.jld2", scfres; save_ψ=true)
-
-
-# TODO can compare with FiniteDifferences.jl and "factor"
-
-derivative_ε = ForwardDiff.derivative(compute_force, 0.0)
-
-derivative_ε_sym = let ε = 1e-5
-    (compute_force(ε; symmetries=true) - F) / ε
-end
-derivative_ε_sym = ForwardDiff.derivative(
-    ε -> compute_force(ε; symmetries=true), 
-    0.0
-)
-
-function compute_quantities(ε::T; Ecut=5, tol=1e-8, symmetries=false) where {T}
+function compute_quantities(ε::T; Ecut, tol=1e-8, symmetries=false) where {T}
     scfres = run_scf(ε; Ecut, tol, symmetries)
     forces = compute_forces_cart(scfres)
     ComponentArray(
@@ -79,13 +50,15 @@ function compute_quantities(ε::T; Ecut=5, tol=1e-8, symmetries=false) where {T}
     )
 end
 
-using DifferentiationInterface
 
 
+mkpath("scf")
 for Ecut in 5:5:50
-    @show Ecut
+    @info "" Ecut
     scfres = run_scf(0.0; Ecut)  # TODO avoid this duplication.
+
+    # Implicit differentiation
     F, dF = value_and_derivative(ε -> compute_quantities(ε; Ecut), AutoForwardDiff(), 0.0)
     save_scfres("scf/Li-BCC-Ecut$Ecut-scfres.jld2", scfres;
-                save_ψ=false, extra_data=Dict("F"=>F, "dF"=>dF))
+        save_ψ=false, extra_data=Dict("F" => F, "dF" => dF))
 end
